@@ -26,6 +26,8 @@ class NetworkRoutingSolver:
         node = self.network.nodes[self.dest]
         while node.node_id != self.source:
             edge = self.previous[node.node_id]
+            if edge is None:
+                return {'cost': float('inf'), 'path': path_edges}
             path_edges.append((edge.src.loc, edge.dest.loc, '{:.0f}'.format(edge.length)))
             total_length += edge.length
             node = edge.src
@@ -33,35 +35,57 @@ class NetworkRoutingSolver:
         return {'cost': total_length, 'path': path_edges}
 
     def computeShortestPaths(self, srcIndex, use_heap=False):
-        assert(self.network is not None)
+        assert (self.network is not None)
 
         self.source = srcIndex
         self.distances = {node.node_id: float('inf') for node in self.network.nodes}
         self.distances[srcIndex] = 0
         self.previous = {node.node_id: None for node in self.network.nodes}
         visited = set()
-        pq = PriorityQueue()
 
         t1 = time.time()
 
-        pq.put(srcIndex, 0)
+        if use_heap:
+            pq = BinaryMinHeap()
+            pq.insertNode(srcIndex, 0)
 
-        while not pq.empty():
-            current_node_id = pq.get()
-            current_node = self.network.nodes[current_node_id]
+            while pq.size() > 0:
+                current_node_id, current_distance = pq.deleteMin()
+                current_node = self.network.nodes[current_node_id]
 
-            if current_node_id in visited:
-                continue
+                if current_node_id in visited:
+                    continue
 
-            visited.add(current_node_id)
+                visited.add(current_node_id)
 
-            for edge in current_node.neighbors:
-                if edge.dest.node_id not in visited:
-                    distance = self.distances[current_node_id] + edge.length
-                    if distance < self.distances[edge.dest.node_id]:
-                        self.distances[edge.dest.node_id] = distance
-                        self.previous[edge.dest.node_id] = edge
-                        pq.put(edge.dest.node_id, distance)
+                for edge in current_node.neighbors:
+                    if edge.dest.node_id not in visited:
+                        distance = self.distances[current_node_id] + edge.length
+                        if distance < self.distances[edge.dest.node_id]:
+                            self.distances[edge.dest.node_id] = distance
+                            self.previous[edge.dest.node_id] = edge
+                            pq.insertNode(edge.dest.node_id, distance)
+
+        else:
+            pq = PriorityQueue()
+            pq.put(srcIndex, 0)
+
+            while not pq.empty():
+                current_node_id = pq.get()
+                current_node = self.network.nodes[current_node_id]
+
+                if current_node_id in visited:
+                    continue
+
+                visited.add(current_node_id)
+
+                for edge in current_node.neighbors:
+                    if edge.dest.node_id not in visited:
+                        distance = self.distances[current_node_id] + edge.length
+                        if distance < self.distances[edge.dest.node_id]:
+                            self.distances[edge.dest.node_id] = distance
+                            self.previous[edge.dest.node_id] = edge
+                            pq.put(edge.dest.node_id, distance)
 
         t2 = time.time()
         return t2 - t1
@@ -83,22 +107,12 @@ class PriorityQueue:
 
 
 class BinaryMinHeap:
-    def __init__(self, network, dist_values):
-        self.heap = [None,]
-        self.end_position = 1
-        self.root = 1
-        self.indicies = {}
-        for node in dist_values:
-            self.insertNode(node, dist_values[node])
+    def __init__(self):
+        self.heap = []
 
     def insertNode(self, node, length):
-        if len(self.heap) == 1:
-            self.heap.append((node, length))
-            self.indicies[node] = 1
-            return 1
-        else:
-            self.heap.append((node, length))
-            self.bubbleUp((node, length), len(self.heap)-1)
+        self.heap.append((node, length))
+        self.bubbleUp(len(self.heap)-1)
 
     def getRightChild(self, position):
         if 2 * position + 1 < len(self.heap):
@@ -125,59 +139,63 @@ class BinaryMinHeap:
     def getLeftChildIndex(position):
         return 2 * position
 
-    def bubbleUp(self, x, i):
-        p = i//2
-        while i != 1 and self.heap[p][1] > x[1]:
-            self.heap[i] = self.heap[p]
-            self.indicies[self.heap[i][0]] = p
-            self.indicies[self.heap[p][0]] = i
+    def bubbleUp(self, i):
+        p = BinaryMinHeap.getParentIndex(i)
+        while i != 0 and self.heap[p][1] > self.heap[i][1]:
+            self.heap[i], self.heap[p] = self.heap[p], self.heap[i]
             i = p
-            p = i // 2
-        self.heap[i] = x
-        self.indicies[self.heap[i][0]] = i
+            p = BinaryMinHeap.getParentIndex(i)
 
     def pop(self):
-        return self.heap.pop()
-
-    def decreaseKey(self, x, i):
-        self.heap[self.indicies[x[0]]] = x
-        self.bubbleUp(x, i)
-
-    def deleteMin(self):
-        if len(self.heap) == 1:
+        if len(self.heap) == 0:
             return None
+        elif len(self.heap) == 1:
+            return self.heap.pop()
         else:
-            min_value = self.heap[1]
-            max_value = self.heap.pop()
-            if len(self.heap) > 1:
-                self.heap[1] = max_value
-                self.siftDown(max_value, 1)
+            min_value = self.heap[0]
+            self.heap[0] = self.heap.pop()
+            self.siftDown(0)
             return min_value
 
-    def siftDown(self, x, i):
+    def decreaseKey(self, x, i):
+        self.heap[i] = x
+        self.bubbleUp(i)
+
+    def deleteMin(self):
+        if len(self.heap) == 0:
+            return None
+        elif len(self.heap) == 1:
+            return self.heap.pop()
+        else:
+            min_value = self.heap[0]
+            max_value = self.heap.pop()
+            self.heap[0] = max_value
+            self.siftDown(0)
+            return min_value
+
+    def siftDown(self, i):
         c = self.minChild(i)
-        while c != 0 and self.heap[c][1] < x[1]:
-            self.heap[i] = (self.heap[c][0], self.heap[c][1])
+        while c != 0 and self.heap[c][1] < self.heap[i][1]:
+            self.heap[i], self.heap[c] = self.heap[c], self.heap[i]
             i = c
             c = self.minChild(i)
-        self.heap[i] = x
 
     def minChild(self, index):
-        if 2 * index > len(self.heap):
-            return 0
-        else:
-            leftChild = self.getLeftChild(index)
-            rightChild = self.getRightChild(index)
-            if rightChild is None and leftChild is None:
-                return 0
-            if rightChild is None:
-                return self.getLeftChildIndex(index)
-            if leftChild[1] < rightChild[1]:
-                return self.getLeftChildIndex(index)
-            elif leftChild[1] > rightChild[1]:
-                return self.getRightChildIndex(index)
+        left_child_index = BinaryMinHeap.getLeftChildIndex(index)
+        right_child_index = BinaryMinHeap.getRightChildIndex(index)
+
+        if right_child_index < len(self.heap):
+            if self.heap[left_child_index][1] < self.heap[right_child_index][1]:
+                return left_child_index
             else:
-                return self.getRightChildIndex(index)
+                return right_child_index
+        elif left_child_index < len(self.heap):
+            return left_child_index
+        else:
+            return 0
+
+    def size(self):
+        return len(self.heap)
 
     def __str__(self):
         return self.heap.__str__()
