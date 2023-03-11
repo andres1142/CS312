@@ -39,15 +39,19 @@ class GeneSequencing:
 
         min_x = min(len(seq1), self.MaxCharactersToAlign)
         min_y = min(len(seq2), self.MaxCharactersToAlign)
+        score = None
         table = None
         if banded is True:
             table = self.banded_algorithm(seq1, seq2)
-            min_y = self.get_last_item_index(table, seq1)
+            min_y = table[len(table) - 1][4]
+            # min_y = self.get_last_item_index(table)
+            score = min_y.get('cost')
         else:
             table = self.unrestricted_algorithm(seq2, seq1)
+            score = table[min_x, min_y].get('cost')
         ###################################################################################################
         # your code should replace these three statements and populate the three variables: score, alignment1 and alignment2
-        score = table[min_x, min_y].get('cost')
+
 
         alignment1 = 'abc-easy  DEBUG:({} chars,align_len={}{})'.format(
             len(seq1), align_length, ',BANDED' if banded else '')
@@ -78,54 +82,59 @@ class GeneSequencing:
 
     def banded_algorithm(self, seq1, seq2):
         min_y = min(len(seq1), self.MaxCharactersToAlign)
-        table = np.zeros((min_y + 1, BAND_WIDTH + 1), dtype=object)
+        # Create the first cases
+        table = []
         self.banded_table_initializer(table)
 
-        for i in range(1, len(table)):
-            nextSpot = {"i": i, "j": 1}
+        # Get bounds
+        curRow = 1
+        while curRow <= min_y:
+            nextSpot = {"i": curRow, "j": 1}
 
-            curColumn = max(1, i - MAXINDELS)
-            upper_bound = min(i + MAXINDELS, len(seq2))
+            curColumn = max(1, curRow - MAXINDELS)
+            upper_bound = min(curRow + MAXINDELS, len(seq2))
+
             while curColumn <= upper_bound:
-                equalChar = seq2[curColumn - 1] == seq1[i - 1]
-                neighbours = self.calculateNeighbours(i, curColumn, nextSpot['j'], seq2, table)
-                table[nextSpot['i'], nextSpot['j']] = self.banded_min_distance(neighbours['left'], neighbours['upLeft'],
-                                                                               neighbours['up'], equalChar, nextSpot)
+                equalChar = seq2[curColumn - 1] == seq1[curRow - 1]
+                # Append new row
+                neighbours = self.calculateNeighbours(seq2, curRow, curColumn, table, nextSpot['j'])
+                table[nextSpot['i']][nextSpot['j']] = self.banded_min_distance(neighbours['left'], neighbours['upLeft'], neighbours['up'], equalChar, nextSpot)
                 curColumn += 1
                 nextSpot['j'] += 1
+            curRow += 1
 
-            if i == self.MaxCharactersToAlign:
-                break
+            if min_y >= len(table) and curRow >= 4:
+                table.append([0 for i in range(8)])
         return table
 
-    def calculateNeighbours(self, curRow, curColumn, curChar, seq2, table):
+
+    def calculateNeighbours(self, seq2, curRow, curColumn,  table, nextSpot):
         lower_bound = max(1, curRow - MAXINDELS)
         upper_bound = min(curRow + MAXINDELS, len(seq2))
 
-        # Deals with last 4 columns
         if upper_bound - lower_bound < 6 and curRow > 4:
             if curColumn == lower_bound:
-                return {'left': 0, 'upLeft': table[curRow - 1, curChar], 'up': table[curRow - 1, curChar - 1]}
+                return {'left': 0, 'upLeft': table[curRow - 1][nextSpot], 'up': table[curRow - 1][nextSpot + 1]}
             elif curColumn == upper_bound:
-                return {'left': table[curRow, curChar - 1], 'upLeft': table[curRow - 1, curChar], 'up': table[curRow - 1, curChar + 1]}
+                return {'left': table[curRow][nextSpot - 1], 'upLeft': table[curRow - 1][nextSpot],
+                        'up': table[curRow - 1][nextSpot + 1]}
             else:
-                return {'left': table[curRow, curChar - 1], 'upLeft': table[curRow - 1, curChar],
-                        'up': table[curRow - 1, curChar]}
+                return {'left': table[curRow][nextSpot - 1], 'upLeft': table[curRow - 1][nextSpot],
+                        'up': table[curRow - 1][nextSpot + 1]}
 
 
-        # Deals with first four columns
         if curRow <= 4:
-            return {'left': table[curRow, curChar - 1], 'upLeft': table[curRow - 1, curChar - 1],
-                    'up': table[curRow - 1, curChar]}
+            return {'left': table[curRow][nextSpot - 1], 'upLeft': table[curRow - 1][nextSpot - 1],
+                    'up': table[curRow - 1][nextSpot]}
 
-        # Because I am padding every row, we need to apply the right shifts
         if curColumn == lower_bound:
-            return {'left': 0, 'upLeft': table[curRow - 1, curChar], 'up': table[curRow - 1, curChar - 1]}
+            return {'left': 0, 'upLeft': table[curRow - 1][nextSpot], 'up': table[curRow - 1][nextSpot + 1]}
         elif curColumn == upper_bound:
-            return {'left': table[curRow, curChar - 1], 'upLeft': table[curRow - 1, curChar], 'up': 0}
+            return {'left': table[curRow][nextSpot - 1], 'upLeft': table[curRow - 1][nextSpot], 'up': 0}
         else:
-            return {'left': table[curRow, curChar - 1], 'upLeft': table[curRow - 1, curChar],
-                    'up': table[curRow - 1, curChar]}
+            return {'left': table[curRow][nextSpot - 1], 'upLeft': table[curRow - 1][nextSpot],
+                    'up': table[curRow - 1][nextSpot + 1]}
+
 
     def min_distance(self, dist_left, dist_upLeft, dist_up, equalChar, i, j):
         min_dist = None
@@ -201,25 +210,37 @@ class GeneSequencing:
             table[0, j] = {'prev': None, 'cost': curValue, 'loc': (0, j)}
             curValue += INDEL
 
+
     def banded_table_initializer(self, table):
-        # Populates the first column.
         curValue = 0
-        for i in range(MAXINDELS + 1):
-            table[i, 0] = {'prev': None, 'cost': curValue, 'loc': (i, 0)}
-            curValue += INDEL
+        array = []
+        for i in range(0, 8):
+            if i < MAXINDELS + 1:
+                array.append({'prev': None, 'cost': curValue, 'loc': (i, 0)})
+                curValue += INDEL
+            else:
+                array.append(0)
 
-        curValue = 0
-        # Populates the first row
-        for j in range(MAXINDELS + 1):
-            table[0, j] = {'prev': None, 'cost': curValue, 'loc': (0, j)}
-            curValue += INDEL
+        table.append(array)
 
-    def get_last_item_index(self, table, seq1):
+        curValue = 5
+        for j in range(1, MAXINDELS + 1):
+            array = []
+            for k in range(0, 8):
+                if k == 0:
+                    array.append({'prev': None, 'cost': curValue, 'loc': (0, j)})
+                    curValue += INDEL
+                else:
+                    array.append(0)
+            table.append(array)
+
+
+    def get_last_item_index(self, table):
         last_item = None
-        n_rows, n_cols = table.shape
-
-        for i in range(n_cols):
-            if table[n_rows - 1, i] != 0:
-                last_item = i
+        for i in range(len(table[len(table) - 1])):
+            if table[len(table) - 1][i] == 0 and i != 0:
+                return last_item
+            else:
+                last_item = table[len(table) - 1][i]
 
         return last_item
