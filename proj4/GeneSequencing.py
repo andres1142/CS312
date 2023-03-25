@@ -54,7 +54,7 @@ class GeneSequencing:
         sequence1 = alignments["seq1"][:100] if len(seq1) > 100 else alignments["seq1"]
         sequence2 = alignments["seq2"][:100] if len(seq2) > 100 else alignments["seq2"]
 
-        return {'align_cost': score[0], 'seqi_first100': sequence1,
+        return {'align_cost': score if banded is False else score[0], 'seqi_first100': sequence1,
                 'seqj_first100': sequence2}
 
     def create_banded_alignment(self, table, seq1, seq2, lastColumn):
