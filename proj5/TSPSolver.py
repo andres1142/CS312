@@ -95,6 +95,7 @@ class TSPSolver:
 	'''
 
 	def branchAndBound( self, time_allowance=60.0 ):
+
 		pass
 
 

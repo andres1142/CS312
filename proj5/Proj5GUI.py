@@ -8,6 +8,7 @@ import time
 
 
 from which_pyqt import PYQT_VER
+
 if PYQT_VER == 'PYQT5':
 	from PyQt5.QtWidgets import *
 	from PyQt5.QtGui import *
