@@ -15,6 +15,7 @@ import copy
 import numpy as np
 from TSPClasses import *
 import heapq
+
 import itertools
 
 
@@ -79,7 +80,40 @@ class TSPSolver:
     '''
 
     def greedy(self, time_allowance=60.0):
-        pass
+        results = {}
+        cities = self._scenario.getCities()
+        matrix = self.createMatrix()
+        ncities = list(range(len(matrix)))
+        current_city = ncities.pop(0)
+        bssf_cost = float('inf')
+        best_route = []
+        cost = 0
+        count = 0
+        route = [cities[current_city]]
+
+        start_time = time.time()
+        while ncities and time.time() - start_time < time_allowance:
+            next_city = min(ncities, key=lambda city: matrix[current_city][city])
+            cost += matrix[current_city][next_city]
+            ncities.remove(next_city)
+            current_city = next_city
+            count += 1
+            route.append(cities[current_city])
+
+            if not ncities and cost < bssf_cost:
+                bssf_cost = cost
+                best_route = route[:]
+        end_time = time.time()
+
+        results['cost'] = bssf_cost if bssf_cost != math.inf else math.inf
+        results['time'] = end_time - start_time
+        results['count'] = count
+        results['soln'] = TSPSolution(best_route)
+        results['max'] = None
+        results['total'] = None
+        results['pruned'] = None
+
+        return results
 
     ''' <summary>
         This is the entry point for the branch-and-bound algorithm that you will implement
@@ -90,39 +124,57 @@ class TSPSolver:
         max queue size, total number of states created, and number of pruned states.</returns>
     '''
 
-    def branchAndBound(self, time_allowance=1000000.0):
-        #  matrix = self.createMatrix()
-        matrix = np.array([
-            [np.inf, 9, np.inf, 8, np.inf],
-            [np.inf, np.inf, 4, np.inf, 2],
-            [np.inf, 3, np.inf, 4, np.inf],
-            [np.inf, 6, 7, np.inf, 12],
-            [1, np.inf, np.inf, 10, np.inf]
-        ])
+    # TODO: Check how many childs I am creating thorughout the whole algorithm
+    def branchAndBound(self, time_allowance=60.0):
+        matrix = self.createMatrix()
         lower_matrix = self.calculateLowerCostMatrix(matrix)
-        #  bssf = self.greedyBSSF(matrix)
-        bssf = 31
+        greedyResult = self.greedyBSSF(matrix)
+        bssf = greedyResult["cost"]
+        bssf_solution = greedyResult["solution"]
         pq = []
         state = 1
+        max_queue_size = 0
+        solutions = 0
+        pruned = 0
 
         heapq.heappush(pq, State(lower_matrix["lowerMatrix"], lower_matrix["lowerBound"], "S{}".format(state)))
         state += 1
 
         start_time = time.time()
-        while len(pq) != 0:
+        while pq and time.time() - start_time < time_allowance:
             # Get the state with the lowest lower bound
             current_state = heapq.heappop(pq)
             if current_state.lower_cost < bssf:
                 # Expand the current state into smaller states
                 subProblems = self.createSubproblems(current_state, state)
                 state = subProblems["state"]
+
+                if len(current_state.citiesFrom) == len(self._scenario.getCities()) and current_state.lower_cost < bssf:
+                    bssf_solution = TSPSolution(self.map_cities(current_state.citiesFrom))
+                    bssf = current_state.lower_cost
+                    solutions += 1
                 for sub_problem in subProblems["subProblems"]:
                     if sub_problem.lower_cost < bssf:
-                        sub_problem.citiesFrom.append(sub_problem.citiesTo[-1])
                         heapq.heappush(pq, sub_problem)
-                if len(sub_problem.citiesFrom) == 5 and sub_problem.lower_cost < bssf:
-                    bssf = sub_problem.lower_cost
-        return bssf
+                    else:
+                        pruned += 1
+                if len(pq) > max_queue_size:
+                    max_queue_size = len(pq)
+            else:
+                pruned += 1
+
+        end_time = time.time()
+        result = {'cost': bssf, 'time': end_time - start_time, 'count': solutions, 'soln': bssf_solution,
+                  'max': max_queue_size, 'total': state, 'pruned': pruned + len(pq)}
+        return result
+
+    def map_cities(self, citiesIndices):
+        cities = self._scenario.getCities()
+        city_map = []
+
+        for i in range(len(citiesIndices)):
+            city_map.append(cities[citiesIndices[i]])
+        return city_map
 
     def createSubproblems(self, current_state, state_id):
         sub_problems = []
@@ -144,26 +196,27 @@ class TSPSolver:
                 # Calculate the minimum value for each row and add it to the lower bound
                 for row in range(len(sub_state.matrix)):
                     if not row in sub_state.citiesFrom:
-                        #  Find the minimum value in the current row
                         min_row_val = np.min(sub_state.matrix[row])
-                        sub_state.lower_cost += min_row_val
-
-                        for column in range(len(sub_state.matrix[row])):
-                            if row != column:
-                                sub_state.matrix[row][column] = sub_state.matrix[row][
-                                                                    column] - min_row_val if min_row_val != np.inf else np.inf
+                        if np.isfinite(min_row_val):
+                            sub_state.lower_cost += min_row_val
+                            sub_state.matrix[row, :] -= min_row_val  # subtract the minimum value from the entire row
+                        else:
+                            sub_state.lower_cost = np.inf
+                            break
 
                 # Calculate the minimum value for each column and add it to the lower bound
-                for column in range(len(sub_state.matrix)):
+                for column in range(sub_state.matrix.shape[1]):
                     if not column in sub_state.citiesTo:
-                        #  Find the minimum value in the current column
                         min_column_val = np.min(sub_state.matrix[:, column])
-                        sub_state.lower_cost += min_column_val
+                        if np.isfinite(min_column_val):
+                            sub_state.lower_cost += min_column_val
+                            sub_state.matrix[:,
+                            column] -= min_column_val  # subtract the minimum value from the entire column
+                        else:
+                            sub_state.lower_cost = np.inf
+                            break
 
-                        for row in range(len(sub_state.matrix)):
-                            if row != column:
-                                sub_state.matrix[row][column] = sub_state.matrix[row][
-                                                                    column] - min_column_val if min_column_val != np.inf else np.inf
+                sub_state.citiesFrom.append(sub_state.citiesTo[-1])
                 sub_problems.append(sub_state)
                 state_id += 1
         return {"subProblems": sub_problems, "state": state_id}
@@ -178,6 +231,8 @@ class TSPSolver:
     '''
 
     def fancy(self, time_allowance=60.0):
+
+
         pass
 
     '''
@@ -227,21 +282,25 @@ class TSPSolver:
     This function calculates the BSSF cost using a greedy algorithm. 
     It is used to calculate the upper bound for the branch and bound algorithm
     '''
-
     def greedyBSSF(self, matrix):
-        cities = list(range(len(matrix)))
-        current_city = cities.pop(0)
+        cities = self._scenario.getCities()
+        ncities = list(range(len(matrix)))
+        current_city = ncities.pop(0)
         bssf_cost = float('inf')
         cost = 0
         count = 0
+        best_route = []
+        route = [cities[current_city]]
 
-        while cities:
-            next_city = min(cities, key=lambda city: matrix[current_city][city])
+        while ncities:
+            next_city = min(ncities, key=lambda city: matrix[current_city][city])
             cost += matrix[current_city][next_city]
-            cities.remove(next_city)
+            ncities.remove(next_city)
             current_city = next_city
             count += 1
+            route.append(cities[current_city])
 
-            if not cities and cost < bssf_cost:
+            if not ncities and cost < bssf_cost:
                 bssf_cost = cost
-        return bssf_cost
+                best_route = route[:]
+        return {"solution": TSPSolution(best_route), "cost": bssf_cost}

@@ -173,4 +173,7 @@ class State:
         self.citiesTo = []
 
     def __lt__(self, other):
-        return self.lower_cost < other.lower_cost
+        if abs(self.lower_cost - other.lower_cost) < 2000:
+            return len(self.citiesTo) > len(other.citiesTo)
+        else:
+            return self.lower_cost < other.lower_cost
