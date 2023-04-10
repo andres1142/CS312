@@ -15,8 +15,7 @@ import copy
 import numpy as np
 from TSPClasses import *
 import heapq
-
-import itertools
+import threading
 
 
 class TSPSolver:
@@ -231,8 +230,7 @@ class TSPSolver:
     '''
 
     def fancy(self, time_allowance=60.0):
-
-
+        self.AntColonyOptimization(time_allowance)
         pass
 
     '''
@@ -282,6 +280,7 @@ class TSPSolver:
     This function calculates the BSSF cost using a greedy algorithm. 
     It is used to calculate the upper bound for the branch and bound algorithm
     '''
+
     def greedyBSSF(self, matrix):
         cities = self._scenario.getCities()
         ncities = list(range(len(matrix)))
@@ -304,3 +303,84 @@ class TSPSolver:
                 bssf_cost = cost
                 best_route = route[:]
         return {"solution": TSPSolution(best_route), "cost": bssf_cost}
+
+    # TODO: Implement Ant Colony Optimization Algorithm
+
+    def AntColonyOptimization(self, time_allowance=60.0):
+        # Initialize algorithm parameters
+        num_ants = 10  # Number of ants per generation
+        num_iterations = 50  # TODO: Number of iterations
+        evaporation_rate = None  # Pheromone evaporation rate
+        alpha = None  # Alpha: Pheromone influence
+        beta = None  # Beta: Heuristic influence
+
+        # Create_distance_matrix
+        matrix = self.createMatrix()
+        # Initialize pheromone matrix with initial_pheromone values
+        pheromone_matrix = np.ones((len(self._scenario.getCities()),
+                                    len(self._scenario.getCities())))
+
+        # TODO: We need to reformat this to return the formatted solution
+        best_solution = None
+        best_cost = np.inf
+
+        for iteration in range(num_iterations):
+            #   a. Find paths and its cost using findAntsPaths function
+            #           ants_paths: List of paths for each ant in the current iteration
+            #           ants_costs: List of costs for each ant in the current iteration
+
+            ants_paths, ants_costs = self.findAntsPaths(num_ants, pheromone_matrix, matrix, alpha, beta)
+
+            #   b. Update the pheromone_matrix using updatePheromone function
+            self.updatePheromone(pheromone_matrix, evaporation_rate, ants_paths, ants_costs)
+
+            #   c. Check for new best solution
+            for i in range(num_ants):
+                if ants_costs[i] < best_cost:
+                    best_cost = ants_costs[i]
+                    best_solution = ants_paths[i]
+
+        # Return the best solution found
+        pass
+
+    # TODO: Implement threads for parallelization
+    def findAntsPaths(self, num_ants, pheromone_matrix, distance_matrix, alpha, beta):
+        # Find the paths for each ant in the current iteration
+
+        # Initialize empty lists for ants_paths and ants_costs
+        ants_paths = [None] * num_ants
+        ants_costs = [None] * num_ants
+
+        #  Helper function that will be executed by each thread
+        def findPath(ant_index):
+            # Find the path for the current ant
+            path, cost = self.findAntPath(ant_index, pheromone_matrix, distance_matrix, alpha, beta)
+            ants_paths[ant_index] = path
+            ants_costs[ant_index] = cost
+
+        # Create and start a thread for each ant
+        threads = []
+        for i in range(num_ants):
+            thread = threading.Thread(target=findPath, args=(i,))
+            threads.append(thread)
+            thread.start()
+
+        # Wait threads to finish
+        for thread in threads:
+            thread.join()
+
+        return ants_paths, ants_costs
+
+    # TODO: Implement the path for individual ants
+    def findAntPath(self, ant_index, pheromone_matrix, distance_matrix, alpha, beta):
+        return [], []
+
+    def calculateProbability(self, current_node, remaining_nodes, pheromone_matrix, distance_matrix, alpha, beta):
+        # Calculate the probability of moving from the current node to each remaining node
+
+        # Select the next node based on the probability distribution
+        pass
+
+    def updatePheromone(self, pheromone_matrix, evaporation_rate, ants_paths, ants_costs):
+        # Update pheromone matrix with evaporation and pheromone deposits
+        pass
