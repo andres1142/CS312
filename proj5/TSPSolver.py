@@ -335,6 +335,7 @@ class TSPSolver:
             #   b. Update the pheromone_matrix using updatePheromone function
             self.updatePheromone(pheromone_matrix, evaporation_rate, ants_paths, ants_costs)
 
+            #TODO: We need to reformat this to return the formatted solution
             #   c. Check for new best solution
             for i in range(num_ants):
                 if ants_costs[i] < best_cost:
@@ -344,7 +345,6 @@ class TSPSolver:
         # Return the best solution found
         pass
 
-    # TODO: Implement threads for parallelization
     def findAntsPaths(self, num_ants, pheromone_matrix, distance_matrix, alpha, beta):
         # Find the paths for each ant in the current iteration
 
@@ -377,20 +377,19 @@ class TSPSolver:
         cities = self._scenario.getCities()
         current_node = random.randint(0, len(cities) - 1) # Select a random node as the starting node
         path = []
-        unvisited_cities = set()
 
         # Uses set difference to remove the current node from the set of unvisited nodes
-        unvisited_nodes = set(range(len(distance_matrix))) - {current_node}
+        unvisited_cities = set(range(len(distance_matrix))) - {current_node}
         path.append(cities[current_node])
 
-        while not unvisited_cities:
+        while unvisited_cities:
             # Select the next node based on the probability distribution
-            next_node = self.calculateProbability(current_node, unvisited_nodes, pheromone_matrix, distance_matrix, alpha, beta)
+            next_node = self.calculateProbability(current_node, unvisited_cities, pheromone_matrix, distance_matrix, alpha, beta)
             unvisited_cities.remove(next_node)
             path.append(cities[next_node])
             current_node = next_node
 
-        return path, 0.0
+        return path, TSPSolution(path).cost()
 
     #TODO: Work here
     def calculateProbability(self, current_node, remaining_nodes, pheromone_matrix, distance_matrix, alpha, beta):
@@ -398,12 +397,16 @@ class TSPSolver:
         numerator = np.power(pheromone_matrix[current_node][list(remaining_nodes)], alpha)
         # Calculate the denominator for the probability formula by raising the distance values between the current node and each remaining node to the power of beta.
         denominator = np.power(distance_matrix[current_node][list(remaining_nodes)], beta)
+        for i in range(len(denominator)):
+            if denominator[i] == 0:
+                denominator[i] = 10 ** -10
 
         probability = numerator / denominator
-        probability = probability / np.sum(probability) # Normalize the probability distribution so that it sums to 1
+        probability = probability / np.sum(probability)  # Normalize the probability distribution so that it sums to 1
+
 
         # Select the next node based on the probability distribution
-        next_node = np.random.choice(remaining_nodes, p=probability)
+        next_node = np.random.choice(list(remaining_nodes), p=probability) # find the value not the index
         return next_node
 
     def updatePheromone(self, pheromone_matrix, evaporation_rate, ants_paths, ants_costs):
