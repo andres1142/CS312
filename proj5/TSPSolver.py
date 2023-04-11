@@ -112,7 +112,7 @@ class TSPSolver:
         results['max'] = None
         results['total'] = None
         results['pruned'] = None
-
+        print("greedy", results)
         return results
 
     ''' <summary>
@@ -166,6 +166,7 @@ class TSPSolver:
         end_time = time.time()
         result = {'cost': bssf, 'time': end_time - start_time, 'count': solutions, 'soln': bssf_solution,
                   'max': max_queue_size, 'total': state, 'pruned': pruned + len(pq)}
+        print("branchAndBound", result)
         return result
 
     def map_cities(self, citiesIndices):
@@ -312,7 +313,7 @@ class TSPSolver:
 
         # Initialize algorithm parameters
         num_ants = 50  # Number of ants per generation
-        num_iterations = 300  # Number of iterations
+        num_iterations = 1000  # Number of iterations
         evaporation_rate = 0.095  # Evaporation rate
         alpha = 0.9  # Alpha: Pheromone influence
         beta = 1.5  # Beta: Heuristic influence
@@ -348,6 +349,7 @@ class TSPSolver:
         results['time'] = end_time - start_time
         results['count'] = count
         results['soln'] = best_solution
+        print("fancy", results)
         return results
 
     def updatePheromone(self, pheromone_matrix, evaporation_rate, solutions):
