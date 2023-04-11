@@ -314,10 +314,12 @@ class TSPSolver:
 
         # Initialize algorithm parameters
         num_ants = 50  # Number of ants per generation
-        num_iterations = 100  # TODO: Number of iterations
-        evaporation_rate = 0.5  # Evaporation rate
-        alpha = 1  # Alpha: Pheromone influence
-        beta = 3  # Beta: Heuristic influence
+        num_iterations = 300  # Number of iterations
+        evaporation_rate = 0.2  # Evaporation rate
+        alpha = 2  # Alpha: Pheromone influence
+        beta = 2  # Beta: Heuristic influence
+        generations_since_update = 0
+        generations = 0
 
         # Create_distance_matrix
         matrix = self.createMatrix()
@@ -325,29 +327,28 @@ class TSPSolver:
         pheromone_matrix = np.ones((len(self._scenario.getCities()),
                                     len(self._scenario.getCities())))
 
-        # TODO: We need to reformat this to return the formatted solution
         best_solution = None
         best_cost = np.inf
 
-        for iteration in range(num_iterations):
-            if time.time() - start_time > time_allowance:
-                break
+        while generations_since_update < num_iterations and time.time() - start_time < time_allowance:
+            generations_since_update += 1
+            generations += 1
 
             #   a. Find paths and its cost using findAntsPaths function
             #           ants_paths: List of paths for each ant in the current iteration
             #           ants_costs: List of costs for each ant in the current iteration
             solutions = self.findAntsPaths(num_ants, pheromone_matrix, matrix, alpha, beta)
 
-
             pheromone_matrix = self.updatePheromone(pheromone_matrix, evaporation_rate, solutions)
 
-            # TODO: We need to reformat this to return the formatted solution
             for solution in solutions:
                 if solution.cost < best_cost:
                     best_cost = solution.cost
                     best_solution = solution
                     count += 1
+                    generations_since_update = 0
 
+        print(generations)
         end_time = time.time()
         # Return the best solution found
         results['cost'] = best_solution.cost
@@ -358,7 +359,7 @@ class TSPSolver:
 
     def updatePheromone(self, pheromone_matrix, evaporation_rate, solutions):
         # Update pheromone matrix with evaporation and pheromone deposits
-        pheromone_matrix = (1 - evaporation_rate) * pheromone_matrix
+        pheromone_matrix = evaporation_rate * pheromone_matrix
 
         for path in solutions:
             for i in range(len(path.route) - 1):
