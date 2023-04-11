@@ -348,7 +348,6 @@ class TSPSolver:
                     count += 1
                     generations_since_update = 0
 
-        print(generations)
         end_time = time.time()
         # Return the best solution found
         results['cost'] = best_solution.cost
