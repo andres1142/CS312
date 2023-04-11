@@ -231,8 +231,7 @@ class TSPSolver:
     '''
 
     def fancy(self, time_allowance=60.0):
-        self.AntColonyOptimization(time_allowance)
-        pass
+        return self.AntColonyOptimization(time_allowance)
 
     '''
     This function creates a matrix of the distances between all cities
@@ -308,6 +307,11 @@ class TSPSolver:
     # TODO: Implement Ant Colony Optimization Algorithm
 
     def AntColonyOptimization(self, time_allowance=60.0):
+        # Initialize counts
+        results = {}
+        count = 0
+        start_time = time.time()
+
         # Initialize algorithm parameters
         num_ants = 50  # Number of ants per generation
         num_iterations = 100  # TODO: Number of iterations
@@ -326,6 +330,9 @@ class TSPSolver:
         best_cost = np.inf
 
         for iteration in range(num_iterations):
+            if time.time() - start_time > time_allowance:
+                break
+
             #   a. Find paths and its cost using findAntsPaths function
             #           ants_paths: List of paths for each ant in the current iteration
             #           ants_costs: List of costs for each ant in the current iteration
@@ -339,9 +346,15 @@ class TSPSolver:
                 if solution.cost < best_cost:
                     best_cost = solution.cost
                     best_solution = solution
+                    count += 1
 
+        end_time = time.time()
         # Return the best solution found
-        pass
+        results['cost'] = best_solution.cost
+        results['time'] = end_time - start_time
+        results['count'] = count
+        results['soln'] = best_solution
+        return results
 
     def updatePheromone(self, pheromone_matrix, evaporation_rate, solutions):
         # Update pheromone matrix with evaporation and pheromone deposits
