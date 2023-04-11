@@ -309,9 +309,9 @@ class TSPSolver:
 
     def AntColonyOptimization(self, time_allowance=60.0):
         # Initialize algorithm parameters
-        num_ants = 10  # Number of ants per generation
+        num_ants = 15  # Number of ants per generation
         num_iterations = 50  # TODO: Number of iterations
-        evaporation_rate = None  # Pheromone evaporation rate
+        evaporation_rate = 0.05 # Evaporation rate
         alpha = 1  # Alpha: Pheromone influence
         beta = 2  # Beta: Heuristic influence
 
@@ -329,35 +329,46 @@ class TSPSolver:
             #   a. Find paths and its cost using findAntsPaths function
             #           ants_paths: List of paths for each ant in the current iteration
             #           ants_costs: List of costs for each ant in the current iteration
-
-            ants_paths, ants_costs = self.findAntsPaths(num_ants, pheromone_matrix, matrix, alpha, beta)
+            ants_paths, ants_costs, solutions = self.findAntsPaths(num_ants, pheromone_matrix, matrix, alpha, beta)
 
             #   b. Update the pheromone_matrix using updatePheromone function
             self.updatePheromone(pheromone_matrix, evaporation_rate, ants_paths, ants_costs)
 
             #TODO: We need to reformat this to return the formatted solution
-            #   c. Check for new best solution
             for i in range(num_ants):
                 if ants_costs[i] < best_cost:
                     best_cost = ants_costs[i]
-                    best_solution = ants_paths[i]
+                    best_solution = solutions[i]
 
         # Return the best solution found
         pass
+
+    def updatePheromone(self, pheromone_matrix, evaporation_rate, ants_paths, ants_costs):
+        # Update pheromone matrix with evaporation and pheromone deposits
+        pheromone_matrix *= (1 - evaporation_rate) # Emulates the natural evaporation of pheromone
+
+        for path, cost in zip(ants_paths, ants_costs):
+            for i in range(len(path) - 1):
+                pheromone_matrix[path[i]][path[i + 1]] += 1 / cost
+                pheromone_matrix[path[i + 1]][path[i]] += 1 / cost
+
+
 
     def findAntsPaths(self, num_ants, pheromone_matrix, distance_matrix, alpha, beta):
         # Find the paths for each ant in the current iteration
 
         # Initialize empty lists for ants_paths and ants_costs
         ants_paths = [None] * num_ants
-        ants_costs = [None] * num_ants
+        ants_costs = [0.0 for i in range(num_ants)]
+        solutions = []
 
         #  Helper function that will be executed by each thread
         def findPath(ant_index):
             # Find the path for the current ant
-            path, cost = self.findAntPath(ant_index, pheromone_matrix, distance_matrix, alpha, beta)
+            path, cost, solution = self.findAntPath(pheromone_matrix, distance_matrix, alpha, beta)
             ants_paths[ant_index] = path
             ants_costs[ant_index] = cost
+            solutions.append(solution)
 
         # Create and start a thread for each ant
         threads = []
@@ -370,13 +381,13 @@ class TSPSolver:
         for thread in threads:
             thread.join()
 
-        return ants_paths, ants_costs
+        return ants_paths, ants_costs, solutions
 
-    # TODO: Implement the path for individual ants
-    def findAntPath(self, ant_index, pheromone_matrix, distance_matrix, alpha, beta):
+    def findAntPath(self, pheromone_matrix, distance_matrix, alpha, beta):
         cities = self._scenario.getCities()
         current_node = random.randint(0, len(cities) - 1) # Select a random node as the starting node
         path = []
+        path_index = []
 
         # Uses set difference to remove the current node from the set of unvisited nodes
         unvisited_cities = set(range(len(distance_matrix))) - {current_node}
@@ -387,12 +398,15 @@ class TSPSolver:
             next_node = self.calculateProbability(current_node, unvisited_cities, pheromone_matrix, distance_matrix, alpha, beta)
             unvisited_cities.remove(next_node)
             path.append(cities[next_node])
+            path_index.append(next_node)
             current_node = next_node
+        solution = TSPSolution(path)
+        return path_index, solution.cost, solution
 
-        return path, TSPSolution(path).cost()
-
-    #TODO: Work here
     def calculateProbability(self, current_node, remaining_nodes, pheromone_matrix, distance_matrix, alpha, beta):
+        if len(remaining_nodes) == 1:
+            return next(iter(remaining_nodes))
+
         # Calculate the numerator for the probability formula by raising the pheromone values between the current node and each remaining node to the power of alpha.
         numerator = np.power(pheromone_matrix[current_node][list(remaining_nodes)], alpha)
         # Calculate the denominator for the probability formula by raising the distance values between the current node and each remaining node to the power of beta.
@@ -404,11 +418,10 @@ class TSPSolver:
         probability = numerator / denominator
         probability = probability / np.sum(probability)  # Normalize the probability distribution so that it sums to 1
 
+        for i in range(len(probability)):
+            if np.isnan(probability[i]):
+                probability[i] = 10 ** -10
 
         # Select the next node based on the probability distribution
         next_node = np.random.choice(list(remaining_nodes), p=probability) # find the value not the index
         return next_node
-
-    def updatePheromone(self, pheromone_matrix, evaporation_rate, ants_paths, ants_costs):
-        # Update pheromone matrix with evaporation and pheromone deposits
-        pass
