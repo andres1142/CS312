@@ -304,8 +304,6 @@ class TSPSolver:
                 best_route = route[:]
         return {"solution": TSPSolution(best_route), "cost": bssf_cost}
 
-    # TODO: Implement Ant Colony Optimization Algorithm
-
     def AntColonyOptimization(self, time_allowance=60.0):
         # Initialize counts
         results = {}
@@ -315,9 +313,9 @@ class TSPSolver:
         # Initialize algorithm parameters
         num_ants = 50  # Number of ants per generation
         num_iterations = 300  # Number of iterations
-        evaporation_rate = 0.2  # Evaporation rate
-        alpha = 2  # Alpha: Pheromone influence
-        beta = 2  # Beta: Heuristic influence
+        evaporation_rate = 0.095  # Evaporation rate
+        alpha = 0.9  # Alpha: Pheromone influence
+        beta = 1.5  # Beta: Heuristic influence
         generations_since_update = 0
         generations = 0
 
@@ -334,11 +332,7 @@ class TSPSolver:
             generations_since_update += 1
             generations += 1
 
-            #   a. Find paths and its cost using findAntsPaths function
-            #           ants_paths: List of paths for each ant in the current iteration
-            #           ants_costs: List of costs for each ant in the current iteration
             solutions = self.findAntsPaths(num_ants, pheromone_matrix, matrix, alpha, beta)
-
             pheromone_matrix = self.updatePheromone(pheromone_matrix, evaporation_rate, solutions)
 
             for solution in solutions:
@@ -358,7 +352,7 @@ class TSPSolver:
 
     def updatePheromone(self, pheromone_matrix, evaporation_rate, solutions):
         # Update pheromone matrix with evaporation and pheromone deposits
-        pheromone_matrix = evaporation_rate * pheromone_matrix
+        pheromone_matrix = (1 - evaporation_rate) * pheromone_matrix
 
         for path in solutions:
             for i in range(len(path.route) - 1):
