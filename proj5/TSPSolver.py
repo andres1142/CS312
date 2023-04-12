@@ -312,9 +312,9 @@ class TSPSolver:
         start_time = time.time()
 
         # Initialize algorithm parameters
-        num_ants = 50  # Number of ants per generation
-        num_iterations = 1000  # Number of iterations
-        evaporation_rate = 0.095  # Evaporation rate
+        num_ants = 80  # Number of ants per generation
+        num_iterations = 500  # Number of iterations
+        base_evaporation_rate = 0.095  # Evaporation rate
         alpha = 0.9  # Alpha: Pheromone influence
         beta = 1.5  # Beta: Heuristic influence
         generations_since_update = 0
@@ -330,6 +330,7 @@ class TSPSolver:
         best_cost = np.inf
 
         while generations_since_update < num_iterations and time.time() - start_time < time_allowance:
+            evaporation_rate = base_evaporation_rate + generations_since_update / num_iterations # allow thorough exploration of high-yield areas, as well as exploration of further areas
             generations_since_update += 1
             generations += 1
 
